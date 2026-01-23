@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Tourism.Data;
 
 namespace Tourism.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class WeatherForecastController : ControllerBase
+public class WeatherForecastController(ApplicationDbContext dbContext) : ControllerBase
 {
     private static readonly string[] Summaries =
     [
