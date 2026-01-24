@@ -1,11 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 
 namespace Tourism.Models;
 
-public class User
+public class User : IdentityUser
 {
-    public int Id { get; set; }
-    public string? FullName { get; set; }
-    public string? UserName { get; set; }
-    public string PasswordHash { get; set; }
+    [Required] [StringLength(100)] public string FullName { get; set; } = null!;
+    public DateTime DateRegistered { get; set; } = DateTime.UtcNow;
 }
