@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Mail;
-using Microsoft.AspNetCore.Identity;
 using Tourism.Models;
 
 namespace Tourism;
@@ -28,7 +27,6 @@ public class AuthService(IConfiguration configuration)
         string message = $"Please reset your password by <a href='{resetLink}'>clicking here</a>.";
         return SendEmailAsync(email, subject, message);
     }
-
 
     private async Task SendEmailAsync(string toEmail, string subject, string messageBody)
     {

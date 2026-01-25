@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Tourism;
@@ -6,14 +7,11 @@ using Tourism.Data;
 using Tourism.Filter;
 using Tourism.Models;
 
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
-builder.Services.AddAuthorization(options =>
-{
-
-});
-
+builder.Services.AddAuthorization(options => { });
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = IdentityConstants.BearerScheme;
@@ -30,13 +28,13 @@ builder.Services
     options.Password.RequireUppercase = false;
     options.Password.RequiredLength = 8;
     options.Password.RequiredUniqueChars = 1;
+
     options.SignIn.RequireConfirmedEmail = true;
     options.SignIn.RequireConfirmedAccount = true;
 
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
-
 
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
     options.User.RequireUniqueEmail = true;
@@ -47,7 +45,6 @@ builder.Services
 builder.Services.AddControllers(options => options.Filters.Add<GlobalExceptionFilter>());
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DBConnection")));
-
 builder.Services.AddTransient<AuthService>();
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -58,6 +55,27 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        await DataSeeder.SeedRolesAsync(services);
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding roles.");
+    }
+}
+
 app.UseHttpsRedirection();
 app.MapControllers();
+app.MapGet("/api/health", async (ApplicationDbContext context) =>
+{
+    await context.Database.ExecuteSqlRawAsync("SELECT 1");
+    return "running";
+});
+
 app.Run();

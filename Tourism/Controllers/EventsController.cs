@@ -66,7 +66,7 @@ public class EventsController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateEvent(int id, [FromBody] UpdateEventDto eventDto)
+    public async Task<IActionResult> UpdateEvent(int id, [FromBody] UpdateEventDto updateEventDto)
     {
         var anEvent = await context.Events.FindAsync(id);
 
@@ -76,14 +76,12 @@ public class EventsController(
             return NotFound();
         }
 
-        anEvent.Name = eventDto.Name;
-        anEvent.Description = eventDto.Description;
-        anEvent.EventDate = eventDto.EventDate;
-        anEvent.Location = eventDto.Location;
-
+        anEvent.Name = updateEventDto.Name;
+        anEvent.Description = updateEventDto.Description;
+        anEvent.EventDate = updateEventDto.EventDate;
+        anEvent.Location = updateEventDto.Location;
         context.Events.Update(anEvent);
         await context.SaveChangesAsync();
-
         return NoContent();
     }
 

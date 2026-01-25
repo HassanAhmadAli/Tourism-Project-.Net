@@ -27,10 +27,9 @@ public class AuthController(
 )
     : ControllerBase
 {
-    [HttpPost("register")]
-    public async Task<ActionResult> Register([FromBody] UserRegisterDto userRegisterDto)
+    [HttpPost("register-user")]
+    public async Task<ActionResult> RegisterUser([FromBody] UserRegisterDto userRegisterDto)
     {
-        // Console.WriteLine(roleManager.Roles.ToList());
         var user = new User
         {
             UserName = userRegisterDto.Email,
@@ -42,9 +41,35 @@ public class AuthController(
         {
             return CreateValidationProblem(result);
         }
-
+        await userManager.AddToRoleAsync(user, "User");
         await SendConfirmationEmailAsync(user, userRegisterDto.Email);
         return Ok(new { Message = "Registration successful. Please check your email to confirm." });
+    }
+
+
+    [HttpPost("register-admin")]
+    public async Task<ActionResult> RegisterAdmin([FromBody] UserRegisterDto userRegisterDto)
+    {
+        var user = new User
+        {
+            UserName = userRegisterDto.Email,
+            Email = userRegisterDto.Email,
+            FullName = userRegisterDto.FullName,
+        };
+        var result = await userManager.CreateAsync(user, userRegisterDto.Password);
+        if (!result.Succeeded)
+        {
+            return CreateValidationProblem(result);
+        }
+        await userManager.AddToRoleAsync(user, "Admin");
+        await SendConfirmationEmailAsync(user, userRegisterDto.Email);
+        return Ok(new { Message = "Registration successful. Please check your email to confirm." });
+    }
+
+    [HttpGet("getRoles")]
+    public async Task<ActionResult> getRoles()
+    {
+        return Ok(roleManager.Roles);
     }
 
     [HttpPost("login")]
@@ -260,10 +285,10 @@ public class AuthController(
     [HttpGet("manage/info")]
     public async Task<ActionResult> GetInfo()
     {
-        Console.WriteLine(User);
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-        return Ok(await CreateInfoResponseAsync(user));
+        var info = await CreateInfoResponseAsync(user);
+        return Ok(info);
     }
 
     [Authorize]
@@ -324,15 +349,13 @@ public class AuthController(
 
     private static readonly EmailAddressAttribute EmailValidator = new();
 
-    private async Task<InfoResponse> CreateInfoResponseAsync(User user)
+    private class InfoResponse
     {
-        return new InfoResponse
-        {
-            Email = await userManager.GetEmailAsync(user) ??
-                    throw new NotSupportedException("Users must have an email."),
-            IsEmailConfirmed = await userManager.IsEmailConfirmedAsync(user),
-        };
+        public string Email { get; set; } = null!;
+        public string FullName { get; set; } = null!;
     }
+    private async Task<AuthController.InfoResponse> CreateInfoResponseAsync(User user) =>
+        new AuthController.InfoResponse { Email = user.Email, FullName = user.FullName, };
 
     private ActionResult CreateValidationProblem(string errorCode, string errorDescription) =>
         ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
