@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "postgresql1": {
+      "restored": true,
+      "restoreTime": "2026-01-25T18:46:10.7675555Z"
+    }
+  },
+  "parameters": {}
+}

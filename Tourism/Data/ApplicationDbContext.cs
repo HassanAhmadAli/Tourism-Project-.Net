@@ -8,8 +8,8 @@ namespace Tourism.Data;
 public partial class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
     : IdentityDbContext<User>(options)
 {
-    // protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    //     => optionsBuilder.UseNpgsql("Name=ConnectionStrings:PgConnection");
+    
+    // protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.UseNpgsql("Name=ConnectionStrings:PgConnection");
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

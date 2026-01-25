@@ -7,7 +7,7 @@ using Tourism.Models;
 
 namespace Tourism.Controllers;
 
-// [Authorize]
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class EventsController(

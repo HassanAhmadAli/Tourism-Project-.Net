@@ -1,71 +1,65 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Tourism.DTO;
+using Tourism.DTO.Auth;
 using Tourism.Models;
+
 
 namespace Tourism.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class IdentityController(
+public class AuthController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
-    IEmailSender<User> emailSender,
+    AuthService emailSender,
     IOptionsMonitor<BearerTokenOptions> bearerTokenOptions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    RoleManager<IdentityRole> roleManager
+)
     : ControllerBase
 {
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] UserRegisterDto registration)
+    public async Task<ActionResult> Register([FromBody] UserRegisterDto userRegisterDto)
     {
-        if (!userManager.SupportsUserEmail)
-        {
-            return StatusCode(500, CreateValidationProblem("Configuration", "User store requires email support."));
-        }
-
+        // Console.WriteLine(roleManager.Roles.ToList());
         var user = new User
         {
-            UserName = registration.Email,
-            Email = registration.Email,
-            FullName = registration.FullName,
+            UserName = userRegisterDto.Email,
+            Email = userRegisterDto.Email,
+            FullName = userRegisterDto.FullName,
         };
-
-        var result = await userManager.CreateAsync(user, registration.Password);
-
+        var result = await userManager.CreateAsync(user, userRegisterDto.Password);
         if (!result.Succeeded)
         {
             return CreateValidationProblem(result);
         }
 
-        await SendConfirmationEmailAsync(user, registration.Email);
+        await SendConfirmationEmailAsync(user, userRegisterDto.Email);
         return Ok(new { Message = "Registration successful. Please check your email to confirm." });
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest login, [FromQuery] bool? useCookies,
-        [FromQuery] bool? useSessionCookies)
+    public async Task<ActionResult> Login([FromBody] LoginRequest login)
     {
-        var useCookieScheme = (useCookies == true) || (useSessionCookies == true);
-        var isPersistent = (useCookies == true) && (useSessionCookies != true);
-
-        signInManager.AuthenticationScheme =
-            useCookieScheme ? IdentityConstants.ApplicationScheme : IdentityConstants.BearerScheme;
+        signInManager.AuthenticationScheme = IdentityConstants.BearerScheme;
         var result =
-            await signInManager.PasswordSignInAsync(login.Email, login.Password, isPersistent, lockoutOnFailure: true);
+            await signInManager.PasswordSignInAsync(login.Email, login.Password, isPersistent: false,
+                lockoutOnFailure: true);
         if (result.RequiresTwoFactor)
         {
             if (!string.IsNullOrEmpty(login.TwoFactorCode))
             {
-                result = await signInManager.TwoFactorAuthenticatorSignInAsync(login.TwoFactorCode, isPersistent,
-                    rememberClient: isPersistent);
+                result = await signInManager.TwoFactorAuthenticatorSignInAsync(login.TwoFactorCode, isPersistent: false,
+                    rememberClient: false);
             }
             else if (!string.IsNullOrEmpty(login.TwoFactorRecoveryCode))
             {
@@ -82,15 +76,13 @@ public class IdentityController(
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshRequest refreshRequest)
+    public async Task<ActionResult> Refresh([FromBody] RefreshRequest refreshRequest)
     {
         var refreshTokenProtector = bearerTokenOptions.Get(IdentityConstants.BearerScheme).RefreshTokenProtector;
         var refreshTicket = refreshTokenProtector.Unprotect(refreshRequest.RefreshToken);
-
-
-        if (refreshTicket?.Properties?.ExpiresUtc is not { } expiresUtc ||
+        if (refreshTicket?.Properties.ExpiresUtc is not { } expiresUtc ||
             timeProvider.GetUtcNow() >= expiresUtc ||
-            await signInManager.ValidateSecurityStampAsync(refreshTicket.Principal) is not User user)
+            await signInManager.ValidateSecurityStampAsync(refreshTicket.Principal) is not { } user)
         {
             return Challenge();
         }
@@ -100,7 +92,7 @@ public class IdentityController(
     }
 
     [HttpGet("confirmEmail")]
-    public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
+    public async Task<ActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
         [FromQuery] string? changedEmail)
     {
         var user = await userManager.FindByIdAsync(userId);
@@ -119,7 +111,6 @@ public class IdentityController(
         }
 
         IdentityResult result;
-
         if (string.IsNullOrEmpty(changedEmail))
         {
             result = await userManager.ConfirmEmailAsync(user, code);
@@ -142,7 +133,7 @@ public class IdentityController(
     }
 
     [HttpPost("resendConfirmationEmail")]
-    public async Task<IActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailRequest resendRequest)
+    public async Task<ActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailRequest resendRequest)
     {
         var user = await userManager.FindByEmailAsync(resendRequest.Email);
         if (user is null)
@@ -155,16 +146,13 @@ public class IdentityController(
     }
 
     [HttpPost("forgotPassword")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest resetRequest)
+    public async Task<ActionResult> ForgotPassword([FromBody] ForgotPasswordRequest resetRequest)
     {
         var user = await userManager.FindByEmailAsync(resetRequest.Email);
-
         if (user is not null && await userManager.IsEmailConfirmedAsync(user))
         {
             var code = await userManager.GeneratePasswordResetTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-
-
             await emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email, HtmlEncoder.Default.Encode(code));
         }
 
@@ -172,10 +160,9 @@ public class IdentityController(
     }
 
     [HttpPost("resetPassword")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest resetRequest)
+    public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordRequest resetRequest)
     {
         var user = await userManager.FindByEmailAsync(resetRequest.Email);
-
         if (user is null || !(await userManager.IsEmailConfirmedAsync(user)))
         {
             return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken()));
@@ -202,11 +189,10 @@ public class IdentityController(
 
     [Authorize]
     [HttpPost("manage/2fa")]
-    public async Task<IActionResult> TwoFactor([FromBody] TwoFactorRequest tfaRequest)
+    public async Task<ActionResult> TwoFactor([FromBody] TwoFactorRequest tfaRequest)
     {
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-
         if (tfaRequest.Enable == true)
         {
             if (tfaRequest.ResetSharedKey)
@@ -272,22 +258,21 @@ public class IdentityController(
 
     [Authorize]
     [HttpGet("manage/info")]
-    public async Task<IActionResult> GetInfo()
+    public async Task<ActionResult> GetInfo()
     {
+        Console.WriteLine(User);
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-
         return Ok(await CreateInfoResponseAsync(user));
     }
 
     [Authorize]
     [HttpPost("manage/info")]
-    public async Task<IActionResult> PostInfo([FromBody] InfoRequest infoRequest)
+    public async Task<ActionResult> PostInfo([FromBody] UserUpdateDto infoRequest)
     {
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-
-        if (!string.IsNullOrEmpty(infoRequest.NewEmail) && !_emailAddressAttribute.IsValid(infoRequest.NewEmail))
+        if (!string.IsNullOrEmpty(infoRequest.NewEmail) && !EmailValidator.IsValid(infoRequest.NewEmail))
         {
             return CreateValidationProblem(
                 IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(infoRequest.NewEmail)));
@@ -297,7 +282,7 @@ public class IdentityController(
         {
             if (string.IsNullOrEmpty(infoRequest.OldPassword))
             {
-                return CreateValidationProblem("OldPasswordRequired",
+                return CreateValidationProblem(errorCode: "OldPasswordRequired", errorDescription:
                     "The old password is required to set a new password. If the old password is forgotten, use /resetPassword.");
             }
 
@@ -321,30 +306,23 @@ public class IdentityController(
         return Ok(await CreateInfoResponseAsync(user));
     }
 
-
     private async Task SendConfirmationEmailAsync(User user, string email, bool isChange = false)
     {
         var code = isChange
             ? await userManager.GenerateChangeEmailTokenAsync(user, email)
             : await userManager.GenerateEmailConfirmationTokenAsync(user);
-
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-
         var userId = await userManager.GetUserIdAsync(user);
-
-
         var confirmEmailUrl = Url.Action(
             nameof(ConfirmEmail),
-            "Identity",
+            "Auth",
             new { userId, code, changedEmail = isChange ? email : null },
             protocol: HttpContext.Request.Scheme);
-
         if (confirmEmailUrl is null) throw new NotSupportedException("Could not generate confirmation URL.");
-
         await emailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(confirmEmailUrl));
     }
 
-    private static readonly EmailAddressAttribute _emailAddressAttribute = new();
+    private static readonly EmailAddressAttribute EmailValidator = new();
 
     private async Task<InfoResponse> CreateInfoResponseAsync(User user)
     {
@@ -356,16 +334,15 @@ public class IdentityController(
         };
     }
 
-    private IActionResult CreateValidationProblem(string errorCode, string errorDescription) =>
+    private ActionResult CreateValidationProblem(string errorCode, string errorDescription) =>
         ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
         {
             { errorCode, [errorDescription] }
         }));
 
-    private IActionResult CreateValidationProblem(IdentityResult result)
+    private ActionResult CreateValidationProblem(IdentityResult result)
     {
         var errorDictionary = new Dictionary<string, string[]>(1);
-
         foreach (var error in result.Errors)
         {
             string[] newDescriptions;
