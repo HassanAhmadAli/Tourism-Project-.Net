@@ -13,7 +13,7 @@ public class InquiriesController(ApplicationDbContext context) : ControllerBase
     [HttpPost("hajj")]
     public async Task<IActionResult> CreateHajjInquiry([FromBody] CreateHajjTripInquiryDto inquiryDto)
     {
-        var inquiryEntity = new HajjTripInquiry
+        var inquiryEntity = new HajjTripInquiryModel
         {
             Nationality = inquiryDto.Nationality,
             CompanyName = inquiryDto.CompanyName,

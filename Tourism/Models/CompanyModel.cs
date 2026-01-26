@@ -1,6 +1,6 @@
 ﻿namespace Tourism.Models;
 
-public class Company
+public class CompanyModel
 {
     public int Id { get; set; }
 }

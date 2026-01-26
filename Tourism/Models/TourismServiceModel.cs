@@ -1,6 +1,6 @@
 ﻿namespace Tourism.Models;
 
-public class TourismService
+public class TourismServiceModel
 {
     public int Id { get; set; }
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using System.Text.Json.Serialization;
 using Tourism;
 using Tourism.Data;
 using Tourism.Filter;
@@ -19,6 +20,7 @@ builder.Services.AddAuthentication(options =>
         options.DefaultScheme = IdentityConstants.BearerScheme;
     })
     .AddBearerToken(IdentityConstants.BearerScheme);
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DBConnection")));
 builder.Services
     .AddIdentityCore<User>(options =>
 {
@@ -42,10 +44,15 @@ builder.Services
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddApiEndpoints();
-builder.Services.AddControllers(options => options.Filters.Add<GlobalExceptionFilter>());
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DBConnection")));
+builder.Services
+    .AddControllers(options => options.Filters.Add<GlobalExceptionFilter>())
+    //.AddJsonOptions(options => options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve)
+    ;
+
 builder.Services.AddTransient<AuthService>();
+
+
+
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {

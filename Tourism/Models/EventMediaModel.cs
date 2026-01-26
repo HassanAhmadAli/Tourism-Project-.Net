@@ -2,7 +2,7 @@
 
 namespace Tourism.Models;
 
-public class EventMedia
+public class EventMediaModel
 {
     [Key] public int Id { get; set; }
 
@@ -14,5 +14,5 @@ public class EventMedia
 
     public int EventId { get; set; }
 
-    public Event Event { get; set; } = null!;
+    public EventModel Event { get; set; } = null!;
 }

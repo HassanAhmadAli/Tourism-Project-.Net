@@ -4,7 +4,7 @@ namespace Tourism.DTO;
 
 public record UserRegisterDto(
     [Required(ErrorMessage = "Full Name is required.")]
-    [StringLength( 100,  MinimumLength =4  , ErrorMessage = "Full Name cannot exceed 100 characters.")]
+    [StringLength( 100,  MinimumLength =4  , ErrorMessage = "Full Name must be between 4 and 100 characters.")]
     string FullName,
     [Required(ErrorMessage = "Email is required.")]
     [EmailAddress]

@@ -3,7 +3,7 @@
 
 namespace Tourism.Data.Models;
 
-public class HajjTripInquiry
+public class HajjTripInquiryModel
 {
     [Key] public int Id { get; set; }
 
