@@ -11,5 +11,11 @@ public record UserRegisterDto(
     string Email,
     [Required(ErrorMessage = "Password is required.")]
     [MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
-    string Password
+    string Password,
+    [Required(ErrorMessage = "PhoneNumber is required.")]
+    [MinLength(4, ErrorMessage = "PhoneNumber must be at least 4 characters long.")]
+    string PhoneNumber,
+    [Required(ErrorMessage = "Nationality is required.")]
+    [StringLength(100)]
+    string Nationality
 );

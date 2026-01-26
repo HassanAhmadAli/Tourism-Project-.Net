@@ -35,7 +35,10 @@ public class AuthController(
             UserName = userRegisterDto.Email,
             Email = userRegisterDto.Email,
             FullName = userRegisterDto.FullName,
+            Nationality = userRegisterDto.Nationality,
+            PhoneNumber = userRegisterDto.PhoneNumber
         };
+
         var result = await userManager.CreateAsync(user, userRegisterDto.Password);
         if (!result.Succeeded)
         {
@@ -55,7 +58,10 @@ public class AuthController(
             UserName = userRegisterDto.Email,
             Email = userRegisterDto.Email,
             FullName = userRegisterDto.FullName,
+            Nationality = userRegisterDto.Nationality,
+            PhoneNumber = userRegisterDto.PhoneNumber
         };
+
         var result = await userManager.CreateAsync(user, userRegisterDto.Password);
         if (!result.Succeeded)
         {
@@ -111,7 +117,6 @@ public class AuthController(
         {
             return Challenge();
         }
-
         var newPrincipal = await signInManager.CreateUserPrincipalAsync(user);
         return SignIn(newPrincipal, IdentityConstants.BearerScheme);
     }
@@ -125,7 +130,6 @@ public class AuthController(
         {
             return Unauthorized();
         }
-
         try
         {
             code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(code));
@@ -148,7 +152,6 @@ public class AuthController(
                 result = await userManager.SetUserNameAsync(user, changedEmail);
             }
         }
-
         if (!result.Succeeded)
         {
             return Unauthorized();
@@ -287,48 +290,91 @@ public class AuthController(
     {
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-        var info = await CreateInfoResponseAsync(user);
+        var info = new AuthController.InfoResponse(user);
+
         return Ok(info);
     }
 
     [Authorize]
-    [HttpPost("manage/info")]
-    public async Task<ActionResult> PostInfo([FromBody] UserUpdateDto infoRequest)
+    [HttpPut("manage/info")]
+    public async Task<ActionResult> PostInfo([FromBody] UserUpdateDto userUpdateDto)
     {
         var user = await userManager.GetUserAsync(User);
         if (user is null) return NotFound();
-        if (!string.IsNullOrEmpty(infoRequest.NewEmail) && !EmailValidator.IsValid(infoRequest.NewEmail))
+
+        bool hasChanges = false;
+
+        // Validate new email if provided
+        if (!string.IsNullOrEmpty(userUpdateDto.Email) && !EmailValidator.IsValid(userUpdateDto.Email))
         {
             return CreateValidationProblem(
-                IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(infoRequest.NewEmail)));
+                IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(userUpdateDto.Email)));
         }
 
-        if (!string.IsNullOrEmpty(infoRequest.NewPassword))
+        // Password change
+        if (!string.IsNullOrEmpty(userUpdateDto.NewPassword))
         {
-            if (string.IsNullOrEmpty(infoRequest.OldPassword))
+            if (string.IsNullOrEmpty(userUpdateDto.OldPassword))
             {
                 return CreateValidationProblem(errorCode: "OldPasswordRequired", errorDescription:
                     "The old password is required to set a new password. If the old password is forgotten, use /resetPassword.");
             }
 
             var changePasswordResult =
-                await userManager.ChangePasswordAsync(user, infoRequest.OldPassword, infoRequest.NewPassword);
+                await userManager.ChangePasswordAsync(user, userUpdateDto.OldPassword, userUpdateDto.NewPassword);
             if (!changePasswordResult.Succeeded)
             {
                 return CreateValidationProblem(changePasswordResult);
             }
         }
 
-        if (!string.IsNullOrEmpty(infoRequest.NewEmail))
+        // Update phone number
+        if (!string.IsNullOrEmpty(userUpdateDto.PhoneNumber) && user.PhoneNumber != userUpdateDto.PhoneNumber)
+        {
+            user.PhoneNumber = userUpdateDto.PhoneNumber;
+            hasChanges = true;
+        }
+
+        // Update full name
+        if (!string.IsNullOrWhiteSpace(userUpdateDto.FullName) && user.FullName != userUpdateDto.FullName)
+        {
+            user.FullName = userUpdateDto.FullName;
+            hasChanges = true;
+        }
+
+        // Update nationality - FIX: Changed user.FullName to user.Nationality
+        if (!string.IsNullOrWhiteSpace(userUpdateDto.Nationality) && user.Nationality != userUpdateDto.Nationality)
+        {
+            user.Nationality = userUpdateDto.Nationality;  // ✅ Fixed
+            hasChanges = true;
+        }
+
+        // Save changes if any
+        if (hasChanges)
+        {
+            var updateResult = await userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return CreateValidationProblem(updateResult);
+            }
+        }
+        if (!string.IsNullOrEmpty(userUpdateDto.Email))
         {
             var email = await userManager.GetEmailAsync(user);
-            if (email != infoRequest.NewEmail)
+            if (email != userUpdateDto.Email)
             {
-                await SendConfirmationEmailAsync(user, infoRequest.NewEmail, isChange: true);
+                var existingUser = await userManager.FindByEmailAsync(userUpdateDto.Email);
+                if (existingUser != null)
+                {
+                    return CreateValidationProblem(
+                        IdentityResult.Failed(userManager.ErrorDescriber.DuplicateEmail(userUpdateDto.Email)));
+                }
+                await SendConfirmationEmailAsync(user, userUpdateDto.Email, isChange: true);
             }
         }
 
-        return Ok(await CreateInfoResponseAsync(user));
+        var info = new InfoResponse(user);
+        return Ok(info);
     }
 
     private async Task SendConfirmationEmailAsync(User user, string email, bool isChange = false)
@@ -349,13 +395,12 @@ public class AuthController(
 
     private static readonly EmailAddressAttribute EmailValidator = new();
 
-    private class InfoResponse
+    private class InfoResponse(User user)
     {
-        public string Email { get; set; } = null!;
-        public string FullName { get; set; } = null!;
+        public string Email { get; set; } = user.Email!;
+        public string FullName { get; set; } = user.FullName;
+        public string PhoneNumber { get; set; } = user.PhoneNumber!;
     }
-    private async Task<AuthController.InfoResponse> CreateInfoResponseAsync(User user) =>
-        new AuthController.InfoResponse { Email = user.Email, FullName = user.FullName, };
 
     private ActionResult CreateValidationProblem(string errorCode, string errorDescription) =>
         ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>

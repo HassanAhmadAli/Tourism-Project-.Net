@@ -140,7 +140,7 @@ public class EventsController(
         var anEventMedia = new EventMediaModel
         {
             FilePath = $"/Uploads/Events/{uniqueFileName}",
-            MediaType = file.ContentType.StartsWith("image") ? "Image" : "Video",
+            MediaType = file.ContentType,
             EventId = eventId
         };
         await context.EventMedia.AddAsync(anEventMedia);

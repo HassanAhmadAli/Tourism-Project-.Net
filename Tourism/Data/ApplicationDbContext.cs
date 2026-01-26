@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Tourism.Data.Models;
+using System.Reflection.Emit;
 using Tourism.Models;
 
 namespace Tourism.Data;
@@ -15,10 +15,12 @@ public partial class ApplicationDbContext(DbContextOptions<ApplicationDbContext>
         {
             entity.HasIndex(e => e.NormalizedEmail, "User_email_key").IsUnique();
         });
+        builder.Entity<InquiryModel>()
+            .Property(i => i.InquiryType)
+            .HasConversion<string>();
         OnModelCreatingPartial(builder);
     }
 
-    public DbSet<HajjTripInquiryModel> HajjTripInquiries { get; set; }
     public IdentityDbContext<User> users { get; set; } = null!;
     public DbSet<EventMediaModel> EventMedia { get; set; }
     public DbSet<EventModel> Events { get; set; }
