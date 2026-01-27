@@ -148,4 +148,29 @@ public class EventsController(
         var eventMediaDto = new EventMediaDto(anEventMedia);
         return Ok(eventMediaDto);
     }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{eventId}/media/{mediaId}")]
+    public async Task<ActionResult> deleteEventMedia(int eventId, int mediaId)
+    {
+        var mediaToDelete = await context.EventMedia.FindAsync(mediaId);
+        if (mediaToDelete == null)
+        {
+            return NotFound(new { Message = $"No media found with ID {mediaId}." });
+        }
+        if (mediaToDelete.EventId != eventId)
+        {
+            return BadRequest(new { Message = "This media item does not belong to the specified event." });
+        }
+        if (!string.IsNullOrWhiteSpace(mediaToDelete.FilePath))
+        {
+            if (System.IO.File.Exists(mediaToDelete.FilePath))
+            {
+                System.IO.File.Delete(mediaToDelete.FilePath);
+            }
+        }
+        context.EventMedia.Remove(mediaToDelete);
+        await context.SaveChangesAsync();
+        return NoContent();
+    }
 }
