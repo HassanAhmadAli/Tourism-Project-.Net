@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tourism.Data;
 using Tourism.DTO.Inquiry;
-using Tourism.Models;
 
 namespace Tourism.Controllers;
 
@@ -109,7 +108,25 @@ public class InquiryController(ApplicationDbContext context) : ControllerBase
     public async Task<ActionResult> CreateInquiry(CreateInquiryDto createDto)
     {
         var UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-
+        var Priority = createDto.Priority ?? "Medium";
+        {
+            switch (createDto.InquiryType)
+            {
+                case InquiryType.None:
+                case InquiryType.Hajj:
+                    break;
+                case InquiryType.Corporate:
+                case InquiryType.Group:
+                case InquiryType.Family:
+                    if (createDto.NumberOfPeople < 2)
+                    {
+                        return BadRequest(
+                            new { Message = "the number of people in the trip must be 2 at least" }
+                        );
+                    }
+                    break;
+            }
+        }
         var inquiry = new InquiryModel
         {
             CompanyName = createDto.CompanyName,
@@ -122,10 +139,10 @@ public class InquiryController(ApplicationDbContext context) : ControllerBase
             PreferredTravelDate = createDto.PreferredTravelDate,
             Destination = createDto.Destination,
             Budget = createDto.Budget,
-            Priority = createDto.Priority ?? "Medium",
+            Priority = Priority,
             LastUpdated = DateTime.UtcNow,
         };
-        context.InquiryModel.Add(inquiry);
+        await context.InquiryModel.AddAsync(inquiry);
         await context.SaveChangesAsync();
         var savedInquiry = (
             await context

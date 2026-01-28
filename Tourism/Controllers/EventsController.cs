@@ -48,25 +48,17 @@ public class EventsController(
         );
     }
 
+    [AllowAnonymous]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> GetAllEvents()
+    public async Task<ActionResult> GetAllEvents([FromQuery] int? locationId)
     {
-        var events = await context
-            .Events.Include(e => e.Media)
-            .Include(e => e.Location)
-            .AsNoTracking()
-            .Select(e => new EventDto(e))
-            .ToListAsync();
-        return Ok(events);
-    }
-
-    [HttpGet("location-id/{locationId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> GetAllEventsByLocation(int locationId)
-    {
-        var events = await context
-            .Events.Where(e => e.LocationId == locationId)
+        var eventsQuerable = context.Events.AsQueryable();
+        if (locationId is not null)
+        {
+            eventsQuerable = eventsQuerable.Where(e => e.LocationId == locationId);
+        }
+        var events = await eventsQuerable
             .Include(e => e.Media)
             .Include(e => e.Location)
             .AsNoTracking()
@@ -75,9 +67,8 @@ public class EventsController(
         return Ok(events);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetEventById(int id)
     {
         var anEvent = await context

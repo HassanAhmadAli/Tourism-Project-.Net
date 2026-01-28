@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -438,6 +439,20 @@ public class AuthController(
 
         var info = new InfoResponse(user);
         return Ok(info);
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<ActionResult> LogOut()
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            return NotFound(new { Message = "User Not Found" });
+        }
+        await userManager.UpdateSecurityStampAsync(user);
+        await signInManager.SignOutAsync();
+        return Ok(new { Message = "Logged out successfully." });
     }
 
     private async Task SendConfirmationEmailAsync(User user, string email, bool isChange = false)
