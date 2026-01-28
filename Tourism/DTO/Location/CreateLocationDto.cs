@@ -36,4 +36,3 @@ public class CreateLocationDto
     [StringLength(100)]
     public string CountryArabic { get; set; } = null!;
 }
-

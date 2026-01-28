@@ -5,6 +5,7 @@ namespace Tourism.DTO.Location;
 public class LocationDto
 {
     public LocationDto() { }
+
     public LocationDto(LocationModel location)
     {
         this.Id = location.Id;
@@ -17,6 +18,7 @@ public class LocationDto
         this.CountryEnglish = location.CountryEnglish;
         this.CountryArabic = location.CountryArabic;
     }
+
     public int Id { get; set; }
     public string NameEnglish { get; set; } = null!;
     public string NameArabic { get; set; } = null!;

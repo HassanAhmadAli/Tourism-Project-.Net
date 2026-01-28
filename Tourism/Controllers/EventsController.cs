@@ -5,7 +5,6 @@ using Tourism.Data;
 using Tourism.Dto;
 using Tourism.DTO;
 using Tourism.DTO.Event;
-using Tourism.DTO.Location;
 using Tourism.Models;
 
 namespace Tourism.Controllers;
@@ -16,14 +15,17 @@ namespace Tourism.Controllers;
 public class EventsController(
     ApplicationDbContext context,
     IWebHostEnvironment env,
-    ILogger<EventsController> logger) : ControllerBase
+    ILogger<EventsController> logger
+) : ControllerBase
 {
-
     [HttpPost("location-id/{locationId}")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateEvent(int locationId, [FromBody] CreateEventDto createEventDto)
+    public async Task<IActionResult> CreateEvent(
+        int locationId,
+        [FromBody] CreateEventDto createEventDto
+    )
     {
         var location = await context.Locations.FindAsync(locationId);
         if (location == null)
@@ -35,19 +37,23 @@ public class EventsController(
             Name = createEventDto.Name,
             Description = createEventDto.Description,
             EventDate = createEventDto.EventDate,
-            Location = location
+            Location = location,
         };
         await context.Events.AddAsync(anEvent);
         await context.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetEventById), new { id = anEvent.Id }, new EventDto(anEvent));
+        return CreatedAtAction(
+            nameof(GetEventById),
+            new { id = anEvent.Id },
+            new EventDto(anEvent)
+        );
     }
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetAllEvents()
     {
-        var events = await context.Events
-            .Include(e => e.Media)
+        var events = await context
+            .Events.Include(e => e.Media)
             .Include(e => e.Location)
             .AsNoTracking()
             .Select(e => new EventDto(e))
@@ -59,8 +65,8 @@ public class EventsController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> GetAllEventsByLocation(int locationId)
     {
-        var events = await context.Events
-             .Where(e => e.LocationId == locationId)
+        var events = await context
+            .Events.Where(e => e.LocationId == locationId)
             .Include(e => e.Media)
             .Include(e => e.Location)
             .AsNoTracking()
@@ -74,14 +80,13 @@ public class EventsController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetEventById(int id)
     {
-        var anEvent = await context.Events
-            .Include(e => e.Media)
+        var anEvent = await context
+            .Events.Include(e => e.Media)
             .Include(e => e.Location)
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id);
         if (anEvent == null)
         {
-            logger.LogWarning("GetEventById: Event with ID {EventId} not found.", id);
             return NotFound();
         }
         return Ok(new EventDto(anEvent));
@@ -89,21 +94,21 @@ public class EventsController(
 
     [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateEvent(int id, [FromBody] UpdateEventDto updateEventDto)
     {
         var anEvent = await context.Events.FindAsync(id);
         if (anEvent == null)
         {
-            logger.LogWarning("UpdateEvent: Event with ID {EventId} not found.", id);
             return NotFound();
         }
         if (!string.IsNullOrWhiteSpace(updateEventDto.Name))
-        { anEvent.Name = updateEventDto.Name; }
+        {
+            anEvent.Name = updateEventDto.Name;
+        }
         if (!string.IsNullOrWhiteSpace(updateEventDto.Description))
-        { anEvent.Description = updateEventDto.Description; }
+        {
+            anEvent.Description = updateEventDto.Description;
+        }
         if (updateEventDto.EventDate is not null)
         {
             anEvent.EventDate = (DateTime)updateEventDto.EventDate;
@@ -124,8 +129,10 @@ public class EventsController(
     public async Task<IActionResult> UploadEventMedia(int eventId, [FromForm] IFormFile file)
     {
         var anEvent = await context.Events.FindAsync(eventId);
-        if (anEvent == null) return NotFound("Event not found.");
-        if (file.Length == 0) return BadRequest("No file uploaded.");
+        if (anEvent == null)
+            return NotFound(new { Message = "Event not found." });
+        if (file.Length == 0)
+            return BadRequest(new { Message = "No file uploaded." });
         var uploadsFolderPath = Path.Combine(env.ContentRootPath, "Uploads", "Events");
         if (!Directory.Exists(uploadsFolderPath))
         {
@@ -141,7 +148,7 @@ public class EventsController(
         {
             FilePath = $"/Uploads/Events/{uniqueFileName}",
             MediaType = file.ContentType,
-            EventId = eventId
+            EventId = eventId,
         };
         await context.EventMedia.AddAsync(anEventMedia);
         await context.SaveChangesAsync();
@@ -160,7 +167,9 @@ public class EventsController(
         }
         if (mediaToDelete.EventId != eventId)
         {
-            return BadRequest(new { Message = "This media item does not belong to the specified event." });
+            return BadRequest(
+                new { Message = "This media item does not belong to the specified event." }
+            );
         }
         if (!string.IsNullOrWhiteSpace(mediaToDelete.FilePath))
         {

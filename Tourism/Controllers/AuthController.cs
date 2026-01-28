@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -11,7 +11,6 @@ using Microsoft.Extensions.Options;
 using Tourism.DTO;
 using Tourism.DTO.Auth;
 using Tourism.Models;
-
 
 namespace Tourism.Controllers;
 
@@ -24,8 +23,7 @@ public class AuthController(
     IOptionsMonitor<BearerTokenOptions> bearerTokenOptions,
     TimeProvider timeProvider,
     RoleManager<IdentityRole> roleManager
-)
-    : ControllerBase
+) : ControllerBase
 {
     [HttpPost("register-user")]
     public async Task<ActionResult> RegisterUser([FromBody] UserRegisterDto userRegisterDto)
@@ -36,7 +34,7 @@ public class AuthController(
             Email = userRegisterDto.Email,
             FullName = userRegisterDto.FullName,
             Nationality = userRegisterDto.Nationality,
-            PhoneNumber = userRegisterDto.PhoneNumber
+            PhoneNumber = userRegisterDto.PhoneNumber,
         };
 
         var result = await userManager.CreateAsync(user, userRegisterDto.Password);
@@ -49,7 +47,6 @@ public class AuthController(
         return Ok(new { Message = "Registration successful. Please check your email to confirm." });
     }
 
-
     [HttpPost("register-admin")]
     public async Task<ActionResult> RegisterAdmin([FromBody] UserRegisterDto userRegisterDto)
     {
@@ -59,7 +56,7 @@ public class AuthController(
             Email = userRegisterDto.Email,
             FullName = userRegisterDto.FullName,
             Nationality = userRegisterDto.Nationality,
-            PhoneNumber = userRegisterDto.PhoneNumber
+            PhoneNumber = userRegisterDto.PhoneNumber,
         };
 
         var result = await userManager.CreateAsync(user, userRegisterDto.Password);
@@ -82,19 +79,27 @@ public class AuthController(
     public async Task<ActionResult> Login([FromBody] LoginRequest login)
     {
         signInManager.AuthenticationScheme = IdentityConstants.BearerScheme;
-        var result =
-            await signInManager.PasswordSignInAsync(login.Email, login.Password, isPersistent: false,
-                lockoutOnFailure: true);
+        var result = await signInManager.PasswordSignInAsync(
+            login.Email,
+            login.Password,
+            isPersistent: false,
+            lockoutOnFailure: true
+        );
         if (result.RequiresTwoFactor)
         {
             if (!string.IsNullOrEmpty(login.TwoFactorCode))
             {
-                result = await signInManager.TwoFactorAuthenticatorSignInAsync(login.TwoFactorCode, isPersistent: false,
-                    rememberClient: false);
+                result = await signInManager.TwoFactorAuthenticatorSignInAsync(
+                    login.TwoFactorCode,
+                    isPersistent: false,
+                    rememberClient: false
+                );
             }
             else if (!string.IsNullOrEmpty(login.TwoFactorRecoveryCode))
             {
-                result = await signInManager.TwoFactorRecoveryCodeSignInAsync(login.TwoFactorRecoveryCode);
+                result = await signInManager.TwoFactorRecoveryCodeSignInAsync(
+                    login.TwoFactorRecoveryCode
+                );
             }
         }
 
@@ -109,11 +114,16 @@ public class AuthController(
     [HttpPost("refresh")]
     public async Task<ActionResult> Refresh([FromBody] RefreshRequest refreshRequest)
     {
-        var refreshTokenProtector = bearerTokenOptions.Get(IdentityConstants.BearerScheme).RefreshTokenProtector;
+        var refreshTokenProtector = bearerTokenOptions
+            .Get(IdentityConstants.BearerScheme)
+            .RefreshTokenProtector;
         var refreshTicket = refreshTokenProtector.Unprotect(refreshRequest.RefreshToken);
-        if (refreshTicket?.Properties.ExpiresUtc is not { } expiresUtc ||
-            timeProvider.GetUtcNow() >= expiresUtc ||
-            await signInManager.ValidateSecurityStampAsync(refreshTicket.Principal) is not { } user)
+        if (
+            refreshTicket?.Properties.ExpiresUtc is not { } expiresUtc
+            || timeProvider.GetUtcNow() >= expiresUtc
+            || await signInManager.ValidateSecurityStampAsync(refreshTicket.Principal)
+                is not { } user
+        )
         {
             return Challenge();
         }
@@ -122,8 +132,11 @@ public class AuthController(
     }
 
     [HttpGet("confirmEmail")]
-    public async Task<ActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
-        [FromQuery] string? changedEmail)
+    public async Task<ActionResult> ConfirmEmail(
+        [FromQuery] string userId,
+        [FromQuery] string code,
+        [FromQuery] string? changedEmail
+    )
     {
         var user = await userManager.FindByIdAsync(userId);
         if (user is null)
@@ -157,20 +170,22 @@ public class AuthController(
             return Unauthorized();
         }
 
-        return Ok("Thank you for confirming your email.");
+        return Ok(new { Message = "Thank you for confirming your email." });
     }
 
     [HttpPost("resendConfirmationEmail")]
-    public async Task<ActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailRequest resendRequest)
+    public async Task<ActionResult> ResendConfirmationEmail(
+        [FromBody] ResendConfirmationEmailRequest resendRequest
+    )
     {
         var user = await userManager.FindByEmailAsync(resendRequest.Email);
         if (user is null)
         {
-            return Ok();
+            return NoContent();
         }
 
         await SendConfirmationEmailAsync(user, resendRequest.Email);
-        return Ok();
+        return NoContent();
     }
 
     [HttpPost("forgotPassword")]
@@ -181,10 +196,13 @@ public class AuthController(
         {
             var code = await userManager.GeneratePasswordResetTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-            await emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email, HtmlEncoder.Default.Encode(code));
+            await emailSender.SendPasswordResetCodeAsync(
+                user,
+                resetRequest.Email,
+                HtmlEncoder.Default.Encode(code)
+            );
         }
-
-        return Ok();
+        return NoContent();
     }
 
     [HttpPost("resetPassword")]
@@ -193,7 +211,9 @@ public class AuthController(
         var user = await userManager.FindByEmailAsync(resetRequest.Email);
         if (user is null || !(await userManager.IsEmailConfirmedAsync(user)))
         {
-            return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken()));
+            return CreateValidationProblem(
+                IdentityResult.Failed(userManager.ErrorDescriber.InvalidToken())
+            );
         }
 
         IdentityResult result;
@@ -212,7 +232,7 @@ public class AuthController(
             return CreateValidationProblem(result);
         }
 
-        return Ok();
+        return NoContent();
     }
 
     [Authorize]
@@ -220,26 +240,38 @@ public class AuthController(
     public async Task<ActionResult> TwoFactor([FromBody] TwoFactorRequest tfaRequest)
     {
         var user = await userManager.GetUserAsync(User);
-        if (user is null) return NotFound();
+        if (user is null)
+            return NotFound();
         if (tfaRequest.Enable == true)
         {
             if (tfaRequest.ResetSharedKey)
             {
-                return CreateValidationProblem("CannotResetSharedKeyAndEnable",
-                    "Resetting the 2fa shared key must disable 2fa until a 2fa token based on the new shared key is validated.");
+                return CreateValidationProblem(
+                    "CannotResetSharedKeyAndEnable",
+                    "Resetting the 2fa shared key must disable 2fa until a 2fa token based on the new shared key is validated."
+                );
             }
 
             if (string.IsNullOrEmpty(tfaRequest.TwoFactorCode))
             {
-                return CreateValidationProblem("RequiresTwoFactor",
-                    "No 2fa token was provided by the request. A valid 2fa token is required to enable 2fa.");
+                return CreateValidationProblem(
+                    "RequiresTwoFactor",
+                    "No 2fa token was provided by the request. A valid 2fa token is required to enable 2fa."
+                );
             }
 
-            if (!await userManager.VerifyTwoFactorTokenAsync(user,
-                    userManager.Options.Tokens.AuthenticatorTokenProvider, tfaRequest.TwoFactorCode))
+            if (
+                !await userManager.VerifyTwoFactorTokenAsync(
+                    user,
+                    userManager.Options.Tokens.AuthenticatorTokenProvider,
+                    tfaRequest.TwoFactorCode
+                )
+            )
             {
-                return CreateValidationProblem("InvalidTwoFactorCode",
-                    "The 2fa token provided by the request was invalid. A valid 2fa token is required to enable 2fa.");
+                return CreateValidationProblem(
+                    "InvalidTwoFactorCode",
+                    "The 2fa token provided by the request was invalid. A valid 2fa token is required to enable 2fa."
+                );
             }
 
             await userManager.SetTwoFactorEnabledAsync(user, true);
@@ -255,10 +287,15 @@ public class AuthController(
         }
 
         string[]? recoveryCodes = null;
-        if (tfaRequest.ResetRecoveryCodes ||
-            (tfaRequest.Enable == true && await userManager.CountRecoveryCodesAsync(user) == 0))
+        if (
+            tfaRequest.ResetRecoveryCodes
+            || (tfaRequest.Enable == true && await userManager.CountRecoveryCodesAsync(user) == 0)
+        )
         {
-            var recoveryCodesEnumerable = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+            var recoveryCodesEnumerable = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(
+                user,
+                10
+            );
             recoveryCodes = recoveryCodesEnumerable?.ToArray();
         }
 
@@ -274,14 +311,17 @@ public class AuthController(
             key = await userManager.GetAuthenticatorKeyAsync(user);
         }
 
-        return Ok(new TwoFactorResponse
-        {
-            SharedKey = key!,
-            RecoveryCodes = recoveryCodes,
-            RecoveryCodesLeft = recoveryCodes?.Length ?? await userManager.CountRecoveryCodesAsync(user),
-            IsTwoFactorEnabled = await userManager.GetTwoFactorEnabledAsync(user),
-            IsMachineRemembered = await signInManager.IsTwoFactorClientRememberedAsync(user),
-        });
+        return Ok(
+            new TwoFactorResponse
+            {
+                SharedKey = key!,
+                RecoveryCodes = recoveryCodes,
+                RecoveryCodesLeft =
+                    recoveryCodes?.Length ?? await userManager.CountRecoveryCodesAsync(user),
+                IsTwoFactorEnabled = await userManager.GetTwoFactorEnabledAsync(user),
+                IsMachineRemembered = await signInManager.IsTwoFactorClientRememberedAsync(user),
+            }
+        );
     }
 
     [Authorize]
@@ -289,7 +329,8 @@ public class AuthController(
     public async Task<ActionResult> GetInfo()
     {
         var user = await userManager.GetUserAsync(User);
-        if (user is null) return NotFound();
+        if (user is null)
+            return NotFound();
         var info = new AuthController.InfoResponse(user);
 
         return Ok(info);
@@ -300,15 +341,20 @@ public class AuthController(
     public async Task<ActionResult> PostInfo([FromBody] UserUpdateDto userUpdateDto)
     {
         var user = await userManager.GetUserAsync(User);
-        if (user is null) return NotFound();
+        if (user is null)
+            return NotFound();
 
         bool hasChanges = false;
 
         // Validate new email if provided
-        if (!string.IsNullOrEmpty(userUpdateDto.Email) && !EmailValidator.IsValid(userUpdateDto.Email))
+        if (
+            !string.IsNullOrEmpty(userUpdateDto.Email)
+            && !EmailValidator.IsValid(userUpdateDto.Email)
+        )
         {
             return CreateValidationProblem(
-                IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(userUpdateDto.Email)));
+                IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(userUpdateDto.Email))
+            );
         }
 
         // Password change
@@ -316,12 +362,17 @@ public class AuthController(
         {
             if (string.IsNullOrEmpty(userUpdateDto.OldPassword))
             {
-                return CreateValidationProblem(errorCode: "OldPasswordRequired", errorDescription:
-                    "The old password is required to set a new password. If the old password is forgotten, use /resetPassword.");
+                return CreateValidationProblem(
+                    errorCode: "OldPasswordRequired",
+                    errorDescription: "The old password is required to set a new password. If the old password is forgotten, use /resetPassword."
+                );
             }
 
-            var changePasswordResult =
-                await userManager.ChangePasswordAsync(user, userUpdateDto.OldPassword, userUpdateDto.NewPassword);
+            var changePasswordResult = await userManager.ChangePasswordAsync(
+                user,
+                userUpdateDto.OldPassword,
+                userUpdateDto.NewPassword
+            );
             if (!changePasswordResult.Succeeded)
             {
                 return CreateValidationProblem(changePasswordResult);
@@ -329,23 +380,32 @@ public class AuthController(
         }
 
         // Update phone number
-        if (!string.IsNullOrEmpty(userUpdateDto.PhoneNumber) && user.PhoneNumber != userUpdateDto.PhoneNumber)
+        if (
+            !string.IsNullOrEmpty(userUpdateDto.PhoneNumber)
+            && user.PhoneNumber != userUpdateDto.PhoneNumber
+        )
         {
             user.PhoneNumber = userUpdateDto.PhoneNumber;
             hasChanges = true;
         }
 
         // Update full name
-        if (!string.IsNullOrWhiteSpace(userUpdateDto.FullName) && user.FullName != userUpdateDto.FullName)
+        if (
+            !string.IsNullOrWhiteSpace(userUpdateDto.FullName)
+            && user.FullName != userUpdateDto.FullName
+        )
         {
             user.FullName = userUpdateDto.FullName;
             hasChanges = true;
         }
 
         // Update nationality - FIX: Changed user.FullName to user.Nationality
-        if (!string.IsNullOrWhiteSpace(userUpdateDto.Nationality) && user.Nationality != userUpdateDto.Nationality)
+        if (
+            !string.IsNullOrWhiteSpace(userUpdateDto.Nationality)
+            && user.Nationality != userUpdateDto.Nationality
+        )
         {
-            user.Nationality = userUpdateDto.Nationality;  // ✅ Fixed
+            user.Nationality = userUpdateDto.Nationality; // ✅ Fixed
             hasChanges = true;
         }
 
@@ -367,7 +427,10 @@ public class AuthController(
                 if (existingUser != null)
                 {
                     return CreateValidationProblem(
-                        IdentityResult.Failed(userManager.ErrorDescriber.DuplicateEmail(userUpdateDto.Email)));
+                        IdentityResult.Failed(
+                            userManager.ErrorDescriber.DuplicateEmail(userUpdateDto.Email)
+                        )
+                    );
                 }
                 await SendConfirmationEmailAsync(user, userUpdateDto.Email, isChange: true);
             }
@@ -387,10 +450,21 @@ public class AuthController(
         var confirmEmailUrl = Url.Action(
             nameof(ConfirmEmail),
             "Auth",
-            new { userId, code, changedEmail = isChange ? email : null },
-            protocol: HttpContext.Request.Scheme);
-        if (confirmEmailUrl is null) throw new NotSupportedException("Could not generate confirmation URL.");
-        await emailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(confirmEmailUrl));
+            new
+            {
+                userId,
+                code,
+                changedEmail = isChange ? email : null,
+            },
+            protocol: HttpContext.Request.Scheme
+        );
+        if (confirmEmailUrl is null)
+            throw new NotSupportedException("Could not generate confirmation URL.");
+        await emailSender.SendConfirmationLinkAsync(
+            user,
+            email,
+            HtmlEncoder.Default.Encode(confirmEmailUrl)
+        );
     }
 
     private static readonly EmailAddressAttribute EmailValidator = new();
@@ -403,10 +477,11 @@ public class AuthController(
     }
 
     private ActionResult CreateValidationProblem(string errorCode, string errorDescription) =>
-        ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
-        {
-            { errorCode, [errorDescription] }
-        }));
+        ValidationProblem(
+            new ValidationProblemDetails(
+                new Dictionary<string, string[]> { { errorCode, [errorDescription] } }
+            )
+        );
 
     private ActionResult CreateValidationProblem(IdentityResult result)
     {
@@ -424,10 +499,8 @@ public class AuthController(
             {
                 newDescriptions = [error.Description];
             }
-
             errorDictionary[error.Code] = newDescriptions;
         }
-
         return ValidationProblem(new ValidationProblemDetails(errorDictionary));
     }
 }

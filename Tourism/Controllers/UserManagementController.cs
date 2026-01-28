@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Tourism.Models;
+
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin")]
@@ -10,24 +12,24 @@ public class UserManagementController(UserManager<User> userManager) : Controlle
     [HttpPost("block/{userId}")]
     public async Task<ActionResult> BlockUser(string userId)
     {
+        var UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var user = await userManager.FindByIdAsync(userId);
-        var me = await userManager.GetUserAsync(User);
 
-        if (user == null || me == null)
+        if (user == null)
         {
-            return NotFound("User not found.");
+            return NotFound(new { Message = "User not found." });
         }
-        if (user.Id == me.Id)
+        if (user.Id == UserId)
         {
-            return BadRequest("YOU MUST NOT BLOCK YOURSELF");
+            return BadRequest(new { Message = "YOU MUST NOT BLOCK YOURSELF" });
         }
         await userManager.SetLockoutEnabledAsync(user, true);
         var result = await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
         if (result.Succeeded)
         {
-            return Ok($"User {user.UserName} has been permanently blocked.");
+            return Ok(new { Message = $"User {user.UserName} has been permanently blocked." });
         }
-        return BadRequest("Could not block user.");
+        return BadRequest(new { Message = "Could not block user." });
     }
 
     [HttpPost("unblock/{userId}")]
@@ -36,15 +38,16 @@ public class UserManagementController(UserManager<User> userManager) : Controlle
         var user = await userManager.FindByIdAsync(userId);
         if (user == null)
         {
-            return NotFound("User not found.");
+            return NotFound(new { Message = "User not found." });
         }
         var result = await userManager.SetLockoutEndDateAsync(user, null);
         if (result.Succeeded)
         {
-            return Ok($"User {user.UserName} has been unblocked.");
+            return Ok(new { Message = $"User {user.UserName} has been unblocked." });
         }
-        return BadRequest("Could not unblock user.");
+        return BadRequest(new { Message = "Could not unblock user." });
     }
+
     [HttpGet]
     public async Task<ActionResult> getUsers()
     {

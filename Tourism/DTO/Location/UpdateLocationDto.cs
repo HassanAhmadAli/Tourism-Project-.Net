@@ -28,4 +28,3 @@ public class UpdateLocationDto
     [StringLength(100)]
     public string? CountryArabic { get; set; }
 }
-

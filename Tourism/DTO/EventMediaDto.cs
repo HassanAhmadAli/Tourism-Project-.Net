@@ -1,5 +1,4 @@
-﻿
-using Tourism.Models;
+﻿using Tourism.Models;
 
 namespace Tourism.Dto;
 
@@ -13,6 +12,7 @@ public class EventMediaDto
         UploadDate = media.UploadDate;
         EventId = media.EventId;
     }
+
     public int Id { get; set; }
 
     public string FilePath { get; set; } = null!;

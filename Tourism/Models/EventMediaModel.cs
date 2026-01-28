@@ -4,11 +4,14 @@ namespace Tourism.Models;
 
 public class EventMediaModel
 {
-    [Key] public int Id { get; set; }
+    [Key]
+    public int Id { get; set; }
 
-    [Required] public string FilePath { get; set; } = null!;
+    [Required]
+    public string FilePath { get; set; } = null!;
 
-    [Required] public string MediaType { get; set; } = null!;
+    [Required]
+    public string MediaType { get; set; } = null!;
 
     public DateTime UploadDate { get; set; } = DateTime.UtcNow;
 
